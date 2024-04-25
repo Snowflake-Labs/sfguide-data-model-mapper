@@ -1,1 +1,1 @@
-# sfguide-getting-started-with-data-modelm-mapper
+# sfguide-getting-started-with-data-model-mapper
