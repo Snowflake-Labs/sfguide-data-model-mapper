@@ -1,4 +1,4 @@
-# data-model-mapper
+# Data Model Mapper
 The Data Model Mapping App - DMM helps consumers map data to target data models and share back to the provider.
 
 All sample code is provided for reference purposes only. Please note that this code is provided “AS IS” and without warranty.  Snowflake will not offer any support for use of the sample code.
