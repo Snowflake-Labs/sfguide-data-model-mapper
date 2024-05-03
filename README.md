@@ -5,6 +5,8 @@ All sample code is provided for reference purposes only. Please note that this c
 
 Copyright (c) 2023 Snowflake Inc. All Rights Reserved.
 
+Please see TAGGING.md for details on object comments.
+
 ## Directions
 1. Run provider_init.sql in your Snowflake environment \
 2. Upload files from toStage/streamlit to a "/streamlit" directory in stage dmm_data_mapper_code.content.files_v1_0 using Snowsight \
