@@ -5,6 +5,16 @@ if 'session' in st.session_state:
     session = st.session_state.session
 
 
+def sanitize(value, action):
+    sanitized = ''
+    if action == 'upper':
+        sanitized = value.upper()
+    elif action == 'add_single_quotes':
+        sanitized = "'{}'".format(value)
+
+    return sanitized
+
+
 def fetch_databases():
     session = st.session_state.session
     databases = session.sql("SHOW DATABASES").collect()
@@ -185,7 +195,11 @@ def save_entity(step):
         st.success('Done Generating Attributes!')
 
     set_entity_list('')
-    update_manager_value('derived', -1, -1)
+    if 'current_relationship_index' in st.session_state:
+        relationship_index_val = st.session_state.current_relationship_index
+    else:
+        relationship_index_val = -1
+    update_manager_value('derived', 0, relationship_index_val)
 
 
 def preview_click(add_condition_filter, page_change):
@@ -334,8 +348,10 @@ def add_derived_attribute():
     collection_name = st.session_state.collection_name
 
     insert_attribute_selections()
-    upper_derived = st.session_state.derived_attribute_name
-    upper_derived = upper_derived.upper()
+
+    derived_upper = sanitize(st.session_state.derived_attribute_name, 'upper')
+    derived_upper_quotes = sanitize(derived_upper, 'add_single_quotes')
+    # sanitize(upper_derived)
 
     if st.session_state.derivation_type == "EXPRESSION":
 
@@ -344,7 +360,7 @@ def add_derived_attribute():
                 [
                     collection_name,
                     st.session_state.force_entity_name,
-                    upper_derived,
+                    derived_upper,
                     "null",
                     True,
                     st.session_state.expression_value_input,
@@ -405,7 +421,7 @@ def add_derived_attribute():
                 [
                     collection_name,
                     st.session_state.force_entity_name,
-                    upper_derived,
+                    derived_upper,
                     attribute_properties,
                     True,
                     lit_value,
@@ -469,7 +485,6 @@ def insert_attribute_selections():
     if st.session_state.is_base:
         for index, row in attribute_edited_pd.iterrows():
             attr_data.append(
-
                 {
                     "SOURCE_COLLECTION_NAME": collection_name,
                     "SOURCE_ENTITY_NAME": st.session_state.force_entity_name,
@@ -479,7 +494,6 @@ def insert_attribute_selections():
     else:
         for index, row in attribute_edited_pd.iterrows():
             attr_data.append(
-
                 {
                     "SOURCE_COLLECTION_NAME": collection_name,
                     "SOURCE_ENTITY_NAME": st.session_state.force_entity_name,
@@ -489,6 +503,11 @@ def insert_attribute_selections():
                 })
 
     initial_data_df = session.create_dataframe(attr_data)
+
+    if st.session_state.is_debug:
+        if st.session_state.is_debug:
+            st.write(st.session_state.is_base)
+            st.dataframe(initial_data_df)
 
     if st.session_state["streamlit_mode"] == "NativeApp":
         target_df = session.table(st.session_state.native_database_name + ".configuration.SOURCE_ENTITY_ATTRIBUTE")
@@ -605,6 +624,8 @@ def remove_filter_relationship():
 
 
 def update_manager_value(step, source_index, relationship_index):
+    st.session_state.current_source_index = source_index
+    st.session_state.current_relationship_index = relationship_index
     if relationship_index == -1:
         st.session_state.is_base = True
     else:
@@ -709,6 +730,7 @@ def update_manager_value(step, source_index, relationship_index):
         st.session_state.show_preview = False
     elif step == 'done_attributes':
         insert_attribute_selections()
+        wizard_manager_pd.loc[mask, 'SOURCE_ENTITY_NAME'] = st.session_state.force_entity_name
         st.session_state.add_derived = False
         st.session_state.show_preview = False
 
@@ -949,12 +971,15 @@ class CollectionJoining(BasePage):
     def print_page(self):
         session = st.session_state.session
 
+        # Set debug flag to on or off this will show multiple df's if set to true
+        st.session_state.is_debug = False
+
         st.header("Add Entity Relationship")
 
         if 'mapping_state' in st.session_state:
             del st.session_state.mapping_state
 
-        # Reinit session vars- had bug in v1.23 check if needed later version
+        # Reinit session vars- had bug in v1.22 check if needed later version
         st.session_state.collection_entity_name = st.session_state.collection_entity_name
 
         if 'wizard_manager' not in st.session_state:
@@ -977,11 +1002,14 @@ class CollectionJoining(BasePage):
                 st.session_state.collection_name = 'Please Add a Collection Name'
                 st.session_state.disable_collection_name = False
                 st.session_state.show_preview = True
+                st.session_state.current_source_index = 0
+                st.session_state.current_relationship_index = -1
 
-        # For Debugging un-comment
         # This will put the manager df on top for keeping track of joins
-        # if 'wizard_manager' in st.session_state:
-        #     st.dataframe(st.session_state.wizard_manager)
+        if st.session_state.is_debug:
+            if 'wizard_manager' in st.session_state:
+                st.dataframe(st.session_state.wizard_manager)
+            st.write(st.session_state)
 
         if st.session_state["streamlit_mode"] == "NativeApp":
             st.session_state.columns_df = (
@@ -1021,9 +1049,7 @@ class CollectionJoining(BasePage):
                     if st.session_state.help_check:
                         st.info('''
                                 This is where you will identify entities for your Source Collection \n
-
-
-                                  ''')
+                                ''')
 
                     percent_complete2 = 0
                     progress_text2 = "Step Completion " + str(percent_complete2) + "%"
@@ -1105,11 +1131,9 @@ class CollectionJoining(BasePage):
                                             " + st.session_state.native_database_name + ".configuration.SOURCE_ENTITY \
                                             WHERE SOURCE_ENTITY_NAME = '" + st.session_state.force_entity_name + "'"
                     else:
-                        source_attribute_of_entity_df = (session.table(
-                            "MODELING.SOURCE_ENTITY_ATTRIBUTE"
-                        ).filter(
-                            col("SOURCE_COLLECTION_NAME") == st.session_state.collection_name).filter(
-                            col("SOURCE_ENTITY_NAME") == st.session_state.force_entity_name)).distinct()
+                        source_attribute_of_entity_df = (session.table("MODELING.SOURCE_ENTITY_ATTRIBUTE")
+                                .filter(col("SOURCE_COLLECTION_NAME") == st.session_state.collection_name)
+                                .filter(col("SOURCE_ENTITY_NAME") == st.session_state.force_entity_name)).distinct()
 
                         source_attribute_of_entity_sql = "SELECT TOP 1 * FROM \
                                             MODELING.SOURCE_ENTITY \
@@ -1149,7 +1173,7 @@ class CollectionJoining(BasePage):
                             if row['DATA TYPE'] == 'TEXT':
                                 agg_function = 'LISTAGG'
                             elif row['DATA TYPE'] == 'FIXED':
-                                agg_function = 'BOOLEAN'
+                                agg_function = 'SUM'
                             elif row['DATA TYPE'] == 'BOOLEAN':
                                 agg_function = 'LISTAGG'
                             elif row['DATA TYPE'] == 'DATE':
@@ -1187,8 +1211,8 @@ class CollectionJoining(BasePage):
 
                             st.session_state.attribute_edited = st.experimental_data_editor(source_attribute_no_agg)
                         else:
-                            # st.dataframe(agg_data_pd)
                             st.session_state.attribute_edited = st.experimental_data_editor(agg_data_pd)
+
                     with entity_col2:
                         if st.session_state.help_check:
                             st.info('''
@@ -1212,10 +1236,10 @@ class CollectionJoining(BasePage):
                             "Add Derived Column/Literal Value",
                             key="add_derived_column",
                             on_click=add_derived
-                            # type="primary",
-                            # args=("Collection_Mapping",),
                         )
+
                     st.text("")
+
                     if 'add_derived' in st.session_state:
                         if st.session_state.add_derived:
                             derive_col1, derive_col2, derive_col3, derive_col4, derive_col5 = st.columns(
@@ -1272,12 +1296,21 @@ class CollectionJoining(BasePage):
                         done_col1, done_col2, done_col3 = st.columns((4, 2.5, 1.9))
                         with done_col3:
                             st.write("#")
+                            if 'current_source_index' in st.session_state:
+                                source_index_val = st.session_state.current_source_index
+                            else:
+                                source_index_val = 0
+                            if 'current_relationship_index' in st.session_state:
+                                relationship_index_val = st.session_state.current_relationship_index
+                            else:
+                                relationship_index_val = -1
+
                             done_adding_button = st.button(
                                 "Done",
                                 key="outside_done",
                                 on_click=update_manager_value,
                                 type="primary",
-                                args=("done_attributes", -1, -1)
+                                args=("done_attributes", source_index_val, relationship_index_val)
                             )
 
                 if st.session_state.current_step == 'preview':
@@ -1525,7 +1558,8 @@ class CollectionJoining(BasePage):
             base_source_value = base_source_index.loc[0, "SOURCE_ENTITY_NAME"]
 
             if len(base_source_index) > 0:
-
+                if st.session_state.is_debug:
+                    st.dataframe(source_entity_pd)
                 base_source_index = \
                     source_entity_pd.loc[source_entity_pd['SOURCE_ENTITY_NAME'] == base_source_value].index[0]
             else:
