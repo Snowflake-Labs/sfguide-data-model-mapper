@@ -34,5 +34,14 @@ class OverviewPage(BasePage):
                 args=("collection_list",),
             )
 
+        # with template_management_col:
+        #     st.write("Target Administration")
+        #     st.button(
+        #         "View/Edit Target Collections",
+        #         on_click=set_page,
+        #         type="primary",
+        #         args=("target_admin",),
+        #     )
+
     def print_sidebar(self):
         super().print_sidebar()

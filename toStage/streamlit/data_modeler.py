@@ -3,6 +3,8 @@ from appPages.overview import OverviewPage
 from appPages.collection_list import CollectionList
 from appPages.collection_joining import CollectionJoining
 from appPages.collection_mapping import CollectionMapping
+from appPages.target_administration import TargetAdministration
+from appPages.entity_configure import EntityConfiguration
 from snowflake.snowpark.context import get_active_session
 
 
@@ -50,7 +52,9 @@ pages = [
     OverviewPage(),
     CollectionList(),
     CollectionJoining(),
-    CollectionMapping()
+    CollectionMapping(),
+    TargetAdministration(),
+    EntityConfiguration()
 ]
 
 

@@ -3,7 +3,7 @@ from snowflake.snowpark.context import get_active_session
 from appPages.page import BasePage, set_page, col, Image, base64, pd
 
 
-def select_collection(collection_entity_name, target_collection_name):
+def select_collection(collection_entity_name, target_collection_name, edit):
     session = st.session_state.session
 
     st.session_state.selected_target_collection = target_collection_name
@@ -20,7 +20,10 @@ def select_collection(collection_entity_name, target_collection_name):
     target_collection_version = target_version_pd.loc[0, "VERSION"]
 
     st.session_state.target_collection_version = target_collection_version
-    set_page("collection_joining")
+    if edit:
+        set_page("entity_config")
+    else:
+        set_page("collection_joining")
 
 
 class CollectionList(BasePage):
@@ -121,7 +124,13 @@ class CollectionList(BasePage):
                         my_bar = st.progress(0, text=progress_text)
 
                         my_bar.progress(percent_complete, text=progress_text)
-
+                        st.button(
+                            ":wrench:",
+                            key="configure" + str(i),
+                            on_click=select_collection,
+                            help="Configure",
+                            args=(collection_entity_name, target_collection_name, True),
+                        )
                 with col5_ex:
                     st.button(
                         "Select",
@@ -129,7 +138,7 @@ class CollectionList(BasePage):
                         use_container_width=True,
                         on_click=select_collection,
                         type="primary",
-                        args=(collection_entity_name, target_collection_name),
+                        args=(collection_entity_name, target_collection_name, False),
                     )
 
     def print_sidebar(self):
