@@ -55,6 +55,13 @@ class BasePage(Page):
             st.session_state.back_page = "collection_joining"
             st.session_state.info = "Please map your collection entities"
 
+        elif st.session_state.page == "target_admin":
+            st.session_state.back_page = "overview"
+            st.session_state.info = "Please select a Target Collection to edit, or Add New Collection button"
+        elif st.session_state.page == "entity_config":
+            st.session_state.back_page = "collection_list"
+            st.session_state.info = "Collection Configuration"
+
         if st.session_state.page == "overview":
             with st.sidebar:
                 side_col1, side_col2 = st.columns((0.5, 2.5))
@@ -186,8 +193,8 @@ class BasePage(Page):
                 with side_col2:
                     st.write("#")
 
-                if 'collection_entity_name' in st.session_state:
-                    st.write(st.session_state.selected_target_collection)
+                # if 'collection_entity_name' in st.session_state:
+                #     st.write(st.session_state.selected_target_collection)
 
                 st.info(st.session_state.info)
                 st.write("#")

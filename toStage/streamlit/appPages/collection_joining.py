@@ -65,31 +65,35 @@ def save_collection_name():
     else:
         target_df = session.table("MODELING.SOURCE_COLLECTION")
 
-    target_df.merge(
-        source_df,
-        (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
-        (target_df["TARGET_ENTITY_NAME"] == st.session_state.collection_entity_name),
-        [
-            when_matched().update(
-                {
-                    "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
-                    "TARGET_COLLECTION_NAME": source_df["TARGET_COLLECTION_NAME"],
-                    "VERSION": source_df["VERSION"],
-                    "TARGET_ENTITY_NAME": source_df["TARGET_ENTITY_NAME"],
-                    "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
-                }
-            ),
-            when_not_matched().insert(
-                {
-                    "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
-                    "TARGET_COLLECTION_NAME": source_df["TARGET_COLLECTION_NAME"],
-                    "VERSION": source_df["VERSION"],
-                    "TARGET_ENTITY_NAME": source_df["TARGET_ENTITY_NAME"],
-                    "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
-                }
-            ),
-        ],
-    )
+    try:
+        target_df.merge(
+            source_df,
+            (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
+            (target_df["TARGET_ENTITY_NAME"] == st.session_state.collection_entity_name),
+            [
+                when_matched().update(
+                    {
+                        "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
+                        "TARGET_COLLECTION_NAME": source_df["TARGET_COLLECTION_NAME"],
+                        "VERSION": source_df["VERSION"],
+                        "TARGET_ENTITY_NAME": source_df["TARGET_ENTITY_NAME"],
+                        "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
+                    }
+                ),
+                when_not_matched().insert(
+                    {
+                        "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
+                        "TARGET_COLLECTION_NAME": source_df["TARGET_COLLECTION_NAME"],
+                        "VERSION": source_df["VERSION"],
+                        "TARGET_ENTITY_NAME": source_df["TARGET_ENTITY_NAME"],
+                        "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
+                    }
+                ),
+            ],
+        )
+    except Exception as e:
+        st.info(e)
+
     st.session_state.disable_collection_name = True
 
 
@@ -128,7 +132,10 @@ def save_entity(step):
                                          WHERE SOURCE_COLLECTION_NAME = '" + st.session_state.collection_name + "' \
                                             AND IS_BASE_ENTITY = True")
                 run_sql = session.sql(update_entity_sql)
-                run = run_sql.collect()
+                try:
+                    run = run_sql.collect()
+                except Exception as e:
+                    st.info(e)
 
                 boolean_flag = True
             else:
@@ -159,39 +166,46 @@ def save_entity(step):
             target_df = session.table("MODELING.SOURCE_ENTITY")
 
         # # Use the MERGE statement to handle insert and update operations
-        target_df.merge(
-            source_df,
-            (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
-            (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
-            (target_df["IS_BASE_ENTITY"] == boolean_flag),
-            [
-                when_matched().update(
-                    {
-                        "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
-                        "ENTITY_FULLY_QUALIFIED_SOURCE": source_df[
-                            "ENTITY_FULLY_QUALIFIED_SOURCE"
-                        ],
-                        "IS_BASE_ENTITY": source_df["IS_BASE_ENTITY"],
-                        "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
-                    }
-                ),
-                when_not_matched().insert(
-                    {
-                        "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
-                        "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
-                        "ENTITY_FULLY_QUALIFIED_SOURCE": source_df[
-                            "ENTITY_FULLY_QUALIFIED_SOURCE"
-                        ],
-                        "IS_BASE_ENTITY": source_df["IS_BASE_ENTITY"],
-                        "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
-                    }
-                ),
-            ],
-        )
+        try:
+            target_df.merge(
+                source_df,
+                (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
+                (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
+                (target_df["IS_BASE_ENTITY"] == boolean_flag),
+                [
+                    when_matched().update(
+                        {
+                            "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
+                            "ENTITY_FULLY_QUALIFIED_SOURCE": source_df[
+                                "ENTITY_FULLY_QUALIFIED_SOURCE"
+                            ],
+                            "IS_BASE_ENTITY": source_df["IS_BASE_ENTITY"],
+                            "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
+                        }
+                    ),
+                    when_not_matched().insert(
+                        {
+                            "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
+                            "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
+                            "ENTITY_FULLY_QUALIFIED_SOURCE": source_df[
+                                "ENTITY_FULLY_QUALIFIED_SOURCE"
+                            ],
+                            "IS_BASE_ENTITY": source_df["IS_BASE_ENTITY"],
+                            "LAST_UPDATED_TIMESTAMP": source_df["LAST_UPDATED_TIMESTAMP"],
+                        }
+                    ),
+                ],
+            )
+        except Exception as e:
+            st.info(e)
 
         with st.spinner('Configuring Attributes...'):
-            session.call("MODELING.GENERATE_ATTRIBUTES", st.session_state.collection_name,
-                         st.session_state.entity_name_input)
+            try:
+                session.call("MODELING.GENERATE_ATTRIBUTES", st.session_state.collection_name,
+                             st.session_state.entity_name_input)
+            except Exception as e:
+                st.info(e)
+
         st.success('Done Generating Attributes!')
 
     set_entity_list('')
@@ -222,7 +236,10 @@ def preview_click(add_condition_filter, page_change):
                     condition_delete_sql = "DELETE FROM MODELING.SOURCE_ENTITY_JOIN_CONDITION WHERE SOURCE_COLLECTION_NAME = '" + st.session_state.collection_name + "'"
 
                 run_condition = session.sql(condition_delete_sql)
-                run_condition.collect()
+                try:
+                    run_condition.collect()
+                except Exception as e:
+                    st.info(e)
 
                 tablename = 'filter_conditions_df' + str(int(time.time() * 1000.0))
                 filter_conditions_df = session.write_pandas(st.session_state.filter_conditions, tablename,
@@ -234,22 +251,25 @@ def preview_click(add_condition_filter, page_change):
                 else:
                     filter_target_df = session.table("MODELING.SOURCE_COLLECTION_FILTER_CONDITION")
 
-                filter_target_df.merge(
-                    filter_conditions_df,
-                    (filter_target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name),
-                    [
+                try:
+                    filter_target_df.merge(
+                        filter_conditions_df,
+                        (filter_target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name),
+                        [
 
-                        when_not_matched().insert(
-                            {
-                                "SOURCE_COLLECTION_NAME": st.session_state.collection_name,
-                                "LEFT_FILTER_EXPRESSION": filter_conditions_df["LEFT_FILTER_EXPRESSION"],
-                                "OPERATOR": filter_conditions_df["OPERATOR"],
-                                "RIGHT_FILTER_EXPRESSION": filter_conditions_df["RIGHT_FILTER_EXPRESSION"],
-                                "LAST_UPDATED_TIMESTAMP": current_timestamp()
-                            }
-                        ),
-                    ],
-                )
+                            when_not_matched().insert(
+                                {
+                                    "SOURCE_COLLECTION_NAME": st.session_state.collection_name,
+                                    "LEFT_FILTER_EXPRESSION": filter_conditions_df["LEFT_FILTER_EXPRESSION"],
+                                    "OPERATOR": filter_conditions_df["OPERATOR"],
+                                    "RIGHT_FILTER_EXPRESSION": filter_conditions_df["RIGHT_FILTER_EXPRESSION"],
+                                    "LAST_UPDATED_TIMESTAMP": current_timestamp()
+                                }
+                            ),
+                        ],
+                    )
+                except Exception as e:
+                    st.info(e)
 
                 filter_conditions_df.drop_table()
 
@@ -267,7 +287,10 @@ def preview_click(add_condition_filter, page_change):
                         ) and SOURCE_COLLECTION_NAME = '" + st.session_state.collection_name + "'"
 
             run = session.sql(entity_sql)
-            run.collect()
+            try:
+                run.collect()
+            except Exception as e:
+                st.info(e)
 
             sorted_df = wizard_pd.sort_values(by=['RELATIONSHIP_INDEX'], ascending=True)
             st.session_state.wizard_manager = sorted_df
@@ -288,27 +311,30 @@ def preview_click(add_condition_filter, page_change):
 
             source_df = session.write_pandas(unique_sorted_df, tablename, auto_create_table=True)
 
-            target_df.merge(
-                source_df,
-                (target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name) &
-                (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]),
-                [
-                    when_matched().update(
-                        {
-                            "JOIN_FROM_SOURCE_ENTITY_NAME": source_df["JOIN_FROM_SOURCE_ENTITY_NAME"],
-                            "JOIN_TYPE": source_df["JOIN_TYPE"],
-                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                        }
-                    ),
-                    when_not_matched().insert(
-                        {
-                            "JOIN_FROM_SOURCE_ENTITY_NAME": source_df["JOIN_FROM_SOURCE_ENTITY_NAME"],
-                            "JOIN_TYPE": source_df["JOIN_TYPE"],
-                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                        }
-                    ),
-                ],
-            )
+            try:
+                target_df.merge(
+                    source_df,
+                    (target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name) &
+                    (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]),
+                    [
+                        when_matched().update(
+                            {
+                                "JOIN_FROM_SOURCE_ENTITY_NAME": source_df["JOIN_FROM_SOURCE_ENTITY_NAME"],
+                                "JOIN_TYPE": source_df["JOIN_TYPE"],
+                                "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                            }
+                        ),
+                        when_not_matched().insert(
+                            {
+                                "JOIN_FROM_SOURCE_ENTITY_NAME": source_df["JOIN_FROM_SOURCE_ENTITY_NAME"],
+                                "JOIN_TYPE": source_df["JOIN_TYPE"],
+                                "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                            }
+                        ),
+                    ],
+                )
+            except Exception as e:
+                st.info(e)
 
             source_df.drop_table()
 
@@ -320,7 +346,10 @@ def preview_click(add_condition_filter, page_change):
                 entity_join_sql = "DELETE FROM MODELING.SOURCE_ENTITY_JOIN_CONDITION WHERE SOURCE_COLLECTION_NAME = '" + st.session_state.collection_name + "'"
 
             run_join = session.sql(entity_join_sql)
-            run_join.collect()
+            try:
+                run_join.collect()
+            except Exception as e:
+                st.info(e)
 
             sorted_df_join = sorted_df.loc[sorted_df['RELATIONSHIP_INDEX'] != -1]
 
@@ -332,8 +361,10 @@ def preview_click(add_condition_filter, page_change):
                                    row['JOIN_FROM_ENTITY_ATTRIBUTE_NAME'] + "', '" + row['OPERATOR'] + "', '" + \
                                    row['JOIN_TO_ENTITY_ATTRIBUTE_NAME'] + "', '" + str(current_time) + "')"
                 session.sql(insert_statement).collect()
-
-            session.call("MODELING.GENERATE_COLLECTION_MODEL", st.session_state.collection_name)
+            try:
+                session.call("MODELING.GENERATE_COLLECTION_MODEL", st.session_state.collection_name)
+            except Exception as e:
+                st.info(e)
 
         if page_change:
             st.session_state.change_after_preview = True
@@ -378,35 +409,38 @@ def add_derived_attribute():
         else:
             target_df = session.table("MODELING.SOURCE_ENTITY_ATTRIBUTE")
 
-        target_df.merge(
-            source_df,
-            (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
-            (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
-            (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]),
-            [
-                when_matched().update(
-                    {
-                        "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
-                        "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
-                        "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
-                        "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-                when_not_matched().insert(
-                    {
-                        "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
-                        "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
-                        "SOURCE_ENTITY_ATTRIBUTE_NAME": source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"],
-                        "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
-                        "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
-                        "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
-                        "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-            ],
-        )
+        try:
+            target_df.merge(
+                source_df,
+                (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
+                (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
+                (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]),
+                [
+                    when_matched().update(
+                        {
+                            "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
+                            "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
+                            "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
+                            "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                    when_not_matched().insert(
+                        {
+                            "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
+                            "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
+                            "SOURCE_ENTITY_ATTRIBUTE_NAME": source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"],
+                            "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
+                            "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
+                            "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
+                            "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                ],
+            )
+        except Exception as e:
+            st.info(e)
 
     else:
         if st.session_state.literal_value_input.isdigit():
@@ -439,35 +473,38 @@ def add_derived_attribute():
         else:
             target_df = session.table("MODELING.SOURCE_ENTITY_ATTRIBUTE")
 
-        target_df.merge(
-            source_df,
-            (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
-            (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
-            (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]),
-            [
-                when_matched().update(
-                    {
-                        "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
-                        "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
-                        "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
-                        "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-                when_not_matched().insert(
-                    {
-                        "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
-                        "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
-                        "SOURCE_ENTITY_ATTRIBUTE_NAME": source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"],
-                        "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
-                        "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
-                        "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
-                        "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-            ],
-        )
+        try:
+            target_df.merge(
+                source_df,
+                (target_df["SOURCE_COLLECTION_NAME"] == source_df["SOURCE_COLLECTION_NAME"]) &
+                (target_df["SOURCE_ENTITY_NAME"] == source_df["SOURCE_ENTITY_NAME"]) &
+                (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]),
+                [
+                    when_matched().update(
+                        {
+                            "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
+                            "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
+                            "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
+                            "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                    when_not_matched().insert(
+                        {
+                            "SOURCE_COLLECTION_NAME": source_df["SOURCE_COLLECTION_NAME"],
+                            "SOURCE_ENTITY_NAME": source_df["SOURCE_ENTITY_NAME"],
+                            "SOURCE_ENTITY_ATTRIBUTE_NAME": source_df["SOURCE_ENTITY_ATTRIBUTE_NAME"],
+                            "SOURCE_ATTRIBUTE_PROPERTIES": source_df["SOURCE_ATTRIBUTE_PROPERTIES"],
+                            "INCLUDE_IN_ENTITY": source_df["INCLUDE_IN_ENTITY"],
+                            "DERIVED_EXPRESSION": source_df["DERIVED_EXPRESSION"],
+                            "AGGREGATION_FUNCTION": source_df["AGGREGATION_FUNCTION"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                ],
+            )
+        except Exception as e:
+            st.info(e)
 
     st.session_state.expression_value_input = ''
     st.session_state.derived_attribute_name = ''
@@ -515,36 +552,42 @@ def insert_attribute_selections():
         target_df = session.table("MODELING.SOURCE_ENTITY_ATTRIBUTE")
 
     if st.session_state.is_base:
-        target_df.merge(
-            initial_data_df,
-            (target_df["SOURCE_COLLECTION_NAME"] == initial_data_df["SOURCE_COLLECTION_NAME"]) &
-            (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == initial_data_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]) &
-            (target_df["SOURCE_ENTITY_NAME"] == initial_data_df["SOURCE_ENTITY_NAME"]),
-            [
-                when_matched().update(
-                    {
-                        "INCLUDE_IN_ENTITY": initial_data_df["INCLUDE_IN_ENTITY"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-            ],
-        )
+        try:
+            target_df.merge(
+                initial_data_df,
+                (target_df["SOURCE_COLLECTION_NAME"] == initial_data_df["SOURCE_COLLECTION_NAME"]) &
+                (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == initial_data_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]) &
+                (target_df["SOURCE_ENTITY_NAME"] == initial_data_df["SOURCE_ENTITY_NAME"]),
+                [
+                    when_matched().update(
+                        {
+                            "INCLUDE_IN_ENTITY": initial_data_df["INCLUDE_IN_ENTITY"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                ],
+            )
+        except Exception as e:
+            st.info(e)
     else:
-        target_df.merge(
-            initial_data_df,
-            (target_df["SOURCE_COLLECTION_NAME"] == initial_data_df["SOURCE_COLLECTION_NAME"]) &
-            (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == initial_data_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]) &
-            (target_df["SOURCE_ENTITY_NAME"] == initial_data_df["SOURCE_ENTITY_NAME"]),
-            [
-                when_matched().update(
-                    {
-                        "AGGREGATION_FUNCTION": initial_data_df['AGGREGATION_FUNCTION'],
-                        "INCLUDE_IN_ENTITY": initial_data_df["INCLUDE_IN_ENTITY"],
-                        "LAST_UPDATED_TIMESTAMP": current_timestamp(),
-                    }
-                ),
-            ],
-        )
+        try:
+            target_df.merge(
+                initial_data_df,
+                (target_df["SOURCE_COLLECTION_NAME"] == initial_data_df["SOURCE_COLLECTION_NAME"]) &
+                (target_df["SOURCE_ENTITY_ATTRIBUTE_NAME"] == initial_data_df["SOURCE_ENTITY_ATTRIBUTE_NAME"]) &
+                (target_df["SOURCE_ENTITY_NAME"] == initial_data_df["SOURCE_ENTITY_NAME"]),
+                [
+                    when_matched().update(
+                        {
+                            "AGGREGATION_FUNCTION": initial_data_df['AGGREGATION_FUNCTION'],
+                            "INCLUDE_IN_ENTITY": initial_data_df["INCLUDE_IN_ENTITY"],
+                            "LAST_UPDATED_TIMESTAMP": current_timestamp(),
+                        }
+                    ),
+                ],
+            )
+        except Exception as e:
+            st.info(e)
 
 
 def add_relationship(source, source_index, relationship_index, relationship):
@@ -1357,7 +1400,8 @@ class CollectionJoining(BasePage):
                         operations_pd = pd.DataFrame(operations)
 
                         if st.session_state.add_filter:
-                            if len(st.session_state.filter_conditions) > 0:
+                            #if len(st.session_state.filter_conditions) > 0:
+                            if len(filter_conditions_pd) > 0:
                                 condition_counter = range(len(st.session_state.filter_conditions))
                             else:
                                 condition_counter = pd.DataFrame()
