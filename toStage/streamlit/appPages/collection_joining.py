@@ -1252,9 +1252,9 @@ class CollectionJoining(BasePage):
                                 ["SOURCE ENTITY ATTRIBUTE NAME", "DATA TYPE", "INCLUDE IN ENTITY",
                                  "DERIVED EXPRESSION"]]
 
-                            st.session_state.attribute_edited = st.experimental_data_editor(source_attribute_no_agg)
+                            st.session_state.attribute_edited = st.data_editor(source_attribute_no_agg)
                         else:
-                            st.session_state.attribute_edited = st.experimental_data_editor(agg_data_pd)
+                            st.session_state.attribute_edited = st.data_editor(agg_data_pd)
 
                     with entity_col2:
                         if st.session_state.help_check:
