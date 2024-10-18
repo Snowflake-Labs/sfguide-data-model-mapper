@@ -20,9 +20,10 @@ The consumer gets an easy tool to help get their data shared, and the provider g
 4. The Consumer shares the data back to the provider in the prescribed shape
 5. The Provider adds the share and incorporates into their pipelines
 
-
 ## Deployment Directions
 1. Import the data_model_mapper.ipynb notebook into your Snowflake environment
 2. Hit Run All
 3. Open the DMM_MODEL_MAPPER_APP from the Apps window in Snowsight and follow directions
 
+## Reference Architecture
+![Reference Architecture](reference-architecture.png)
