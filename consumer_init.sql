@@ -28,7 +28,7 @@ call system$wait(5);
 
 /* create warehouse */
 create warehouse if not exists drb_data_mapper_wh 
-comment='{"origin":"sf_ps_wls","name":"drb","version":{"major":1, "minor":0},"attributes":{"component":"drb"}}';
+comment='{"origin":"sf_sit","name":"dmm","version":{"major":1, "minor":0},"attributes":{"component":"dmm"}}';
 
 
 /* create role and add permissions required by role for installation of framework */
