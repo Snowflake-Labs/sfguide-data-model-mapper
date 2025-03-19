@@ -2,18 +2,19 @@ import streamlit as st
 from appPages.page import BasePage, col, set_page
 
 
+#This page is not currently being leveraged in the framework but you could use it as a landing page if wanted/needed. This is a welcome page for the consumer.
+
 class OverviewPage(BasePage):
     def __init__(self):
         self.name = "overview"
 
     def print_page(self):
         session = st.session_state.session
-        if 'helpe_check' not in st.session_state:
+        if 'help_check' not in st.session_state:
             st.session_state.help_check = False
 
         collection_names_pd = (
             session.table("ADMIN.SUBSCRIPTION")
-            .sort(col("LAST_UPDATED_TIMESTAMP").asc())
             .select(col("CUSTOMER_NAME"), col("TARGET_COLLECTION_NAME"))
             .distinct()
             .to_pandas()
@@ -33,16 +34,6 @@ class OverviewPage(BasePage):
                 type="primary",
                 args=("collection_list",),
             )
-
-        # with template_management_col:
-        #     st.write("Target Administration")
-        #     st.button(
-        #         "View/Edit Target Collections",
-        #         on_click=set_page,
-        #         type="primary",
-        #         args=("target_admin",),
-        #     )
-
 
     def print_sidebar(self):
         super().print_sidebar()

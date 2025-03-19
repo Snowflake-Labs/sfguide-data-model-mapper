@@ -32,8 +32,9 @@ class CollectionList(BasePage):
 
     def print_page(self):
         session = st.session_state.session
+        if 'help_check' not in st.session_state:
+            st.session_state.help_check = False
         st.header("Target Collections")
-        st.write("#")
 
         # Clear out selections if previously configuring other
         if 'wizard_manager' in st.session_state:
@@ -45,7 +46,6 @@ class CollectionList(BasePage):
 
         collection_names_pd = (
             session.table("ADMIN.SUBSCRIPTION")
-            .sort(col("LAST_UPDATED_TIMESTAMP").asc())
             .select(col("CUSTOMER_NAME"), col("TARGET_COLLECTION_NAME"))
             .distinct()
             .to_pandas()
@@ -71,17 +71,16 @@ class CollectionList(BasePage):
         for i in range(len(collection_entity_list_pd)):
             if i == 0:
                 st.subheader(collection_entity_list_pd.loc[i, "TARGET_COLLECTION_NAME"])
-                st.write('#')
+
             else:
-                st.write('#')
                 if (collection_entity_list_pd.loc[i - 1, "TARGET_COLLECTION_NAME"] !=
                         collection_entity_list_pd.loc[i, "TARGET_COLLECTION_NAME"]):
                     st.subheader(collection_entity_list_pd.loc[i, "TARGET_COLLECTION_NAME"])
-                    st.write('#')
 
             target_collection_name = collection_entity_list_pd.loc[i, "TARGET_COLLECTION_NAME"]
 
             with st.expander("", expanded=True):
+            
                 collection_entity_name = collection_entity_list_pd.loc[i, "TARGET_ENTITY_NAME"]
 
                 col1_ex, col2_ex, col3_ex, col4_ex, col5_ex = st.columns(
@@ -119,18 +118,22 @@ class CollectionList(BasePage):
                     st.subheader(collection_entity_name)
 
                 with col4_ex:
-                        percent_complete = 0
-                        progress_text = ("Mapping Completion " + str(percent_complete) + "%")
-                        my_bar = st.progress(0, text=progress_text)
+                        #percent_complete = 0
+                        #progress_text = ("Mapping Completion " + str(percent_complete) + "%")
+                        #my_bar = st.progress(0, text=progress_text)
+                        #percent_complete = 0
+                        #progress_text = ("Mapping Completion " + str(percent_complete) + "%")
+                        #my_bar = st.progress(0, text=progress_text)
 
-                        my_bar.progress(percent_complete, text=progress_text)
-                        st.button(
-                            ":wrench:",
-                            key="configure" + str(i),
-                            on_click=select_collection,
-                            help="Configure",
-                            args=(collection_entity_name, target_collection_name, True),
-                        )
+                        #my_bar.progress(percent_complete, text=progress_text)
+                        #my_bar.progress(percent_complete, text=progress_text)
+                    st.button(
+                        "Configure",
+                        key="configure" + str(i),
+                        use_container_width=True,
+                        on_click=select_collection,
+                        args=(collection_entity_name, target_collection_name, True),
+                    )
                 with col5_ex:
                     st.button(
                         "Select",
