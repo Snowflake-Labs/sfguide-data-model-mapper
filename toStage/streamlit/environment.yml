@@ -3,3 +3,4 @@ channels:
 - snowflake
 dependencies:
 - snowflake-native-apps-permission
+- editdistance

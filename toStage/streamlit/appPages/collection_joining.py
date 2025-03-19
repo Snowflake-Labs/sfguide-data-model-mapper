@@ -61,7 +61,7 @@ def save_collection_name():
     ).with_column("LAST_UPDATED_TIMESTAMP", current_timestamp())
 
     if st.session_state["streamlit_mode"] == "NativeApp":
-        target_df = session.table(st.session_state.native_database_name +".configuration.SOURCE_COLLECTION")
+        target_df = session.table(st.session_state.native_database_name + ".configuration.SOURCE_COLLECTION")
     else:
         target_df = session.table("MODELING.SOURCE_COLLECTION")
 
@@ -219,7 +219,7 @@ def save_entity(step):
 def preview_click(add_condition_filter, page_change):
     session = st.session_state.session
     check_pd = pd.DataFrame(st.session_state.wizard_manager)
-    default_values = check_pd.isin(['Add Derived Column/Literal Value', 'Add New', 'Please Select']).any().any()
+    default_values = check_pd.isin(['Add Derived Column/Literal Value', 'add_new', 'Please Select']).any().any()
 
     if default_values:
         st.error(
@@ -254,7 +254,12 @@ def preview_click(add_condition_filter, page_change):
                 try:
                     filter_target_df.merge(
                         filter_conditions_df,
-                        (filter_target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name),
+                        (filter_target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name) &
+                        (filter_target_df["RIGHT_FILTER_EXPRESSION"] == filter_conditions_df[
+                            "RIGHT_FILTER_EXPRESSION"]) &
+                        (filter_target_df["LEFT_FILTER_EXPRESSION"] == filter_conditions_df["LEFT_FILTER_EXPRESSION"]) &
+                        (filter_target_df["OPERATOR"] == filter_conditions_df["OPERATOR"])
+                        ,
                         [
 
                             when_not_matched().insert(
@@ -270,8 +275,6 @@ def preview_click(add_condition_filter, page_change):
                     )
                 except Exception as e:
                     st.info(e)
-
-                filter_conditions_df.drop_table()
 
             wizard_pd = pd.DataFrame(st.session_state.wizard_manager)
             entity_names = wizard_pd.apply(
@@ -302,7 +305,8 @@ def preview_click(add_condition_filter, page_change):
 
             unique_df = sorted_df[(sorted_df['RELATIONSHIP_INDEX'] != -1)]
             dropped_sorted_df = unique_df.drop(
-                columns=['JOIN_FROM_ENTITY_ATTRIBUTE_NAME', 'ENTITY_FULLY_QUALIFIED_SOURCE' ,'OPERATOR', 'JOIN_TO_ENTITY_ATTRIBUTE_NAME', 'SOURCE_INDEX',
+                columns=['JOIN_FROM_ENTITY_ATTRIBUTE_NAME', 'ENTITY_FULLY_QUALIFIED_SOURCE', 'OPERATOR',
+                         'JOIN_TO_ENTITY_ATTRIBUTE_NAME', 'SOURCE_INDEX',
                          'RELATIONSHIP_INDEX'])
 
             unique_sorted_df = dropped_sorted_df.drop_duplicates()
@@ -591,7 +595,6 @@ def insert_attribute_selections():
 
 
 def add_relationship(source, source_index, relationship_index, relationship):
-
     if relationship_index == 0:
         join_from_source_entity_name = source
     else:
@@ -656,14 +659,48 @@ def remove_relationship():
 
 
 def remove_filter_relationship():
+    session = st.session_state.session
     new_pd = pd.DataFrame(st.session_state.filter_conditions)
+    #st.write(new_pd)
 
     last_relation_row = new_pd[['CONDITION_INDEX']].idxmax()
     last_relation_index = last_relation_row.iloc[0]
 
+    delete_row = new_pd[new_pd['CONDITION_INDEX'] == last_relation_row['CONDITION_INDEX']]
+
+    #st.write(last_relation_row)
+
+    if st.session_state["streamlit_mode"] == "NativeApp":
+        filter_target_df = session.table(
+            st.session_state.native_database_name + ".configuration.SOURCE_COLLECTION_FILTER_CONDITION")
+    else:
+        filter_target_df = session.table("MODELING.SOURCE_COLLECTION_FILTER_CONDITION")
+
+    tablename = 'filter_conditions_df' + str(int(time.time() * 1000.0))
+    delete_row = session.write_pandas(delete_row, tablename, auto_create_table=True)
+
+    try:
+        filter_target_df.merge(
+            delete_row,
+            (filter_target_df["SOURCE_COLLECTION_NAME"] == st.session_state.collection_name) &
+            (filter_target_df["RIGHT_FILTER_EXPRESSION"] == delete_row["RIGHT_FILTER_EXPRESSION"]) &
+            (filter_target_df["LEFT_FILTER_EXPRESSION"] == delete_row["LEFT_FILTER_EXPRESSION"]) &
+            (filter_target_df["OPERATOR"] == delete_row["OPERATOR"])
+            ,
+            [
+
+                when_matched().delete(),
+            ],
+        )
+    except Exception as e:
+        st.info(e)
+
+    delete_row.drop_table()
     new_pd.drop(last_relation_index, axis=0, inplace=True)
 
     st.session_state.filter_conditions = new_pd
+    session.call("MODELING.GENERATE_COLLECTION_MODEL", st.session_state.collection_name)
+    #st.write(st.session_state.filter_conditions)
 
 
 def update_manager_value(step, source_index, relationship_index):
@@ -900,7 +937,8 @@ def set_selection_values(state):
             # Get collection filter conditions
             if st.session_state["streamlit_mode"] == "NativeApp":
                 filter_condition_pd = (
-                    session.table(st.session_state.native_database_name + ".configuration.SOURCE_COLLECTION_FILTER_CONDITION")
+                    session.table(
+                        st.session_state.native_database_name + ".configuration.SOURCE_COLLECTION_FILTER_CONDITION")
                     .filter(col("SOURCE_COLLECTION_NAME") == collection_name).to_pandas()
                 )
             else:
@@ -1012,12 +1050,40 @@ class CollectionJoining(BasePage):
         self.name = "collection_joining"
 
     def print_page(self):
+        #st.write(st.session_state)
         session = st.session_state.session
+
+        # if st.session_state.current_step == "derived":
+        #     st.button(
+        #         label="Back",
+        #         key="back" + str(self.name),
+        #         help="Warning: Changes will be lost!",
+        #         on_click=set_page,
+        #         args=("overview",),
+        #     )
+
+        # elif st.session_state.current_step == "preview":
+        #     st.button(
+        #         label="Back",
+        #         key="back" + str(self.name),
+        #         help="Warning: Changes will be lost!",
+        #         on_click=set_page,
+        #         args=("overview",),
+        #     )
+
+        # else:
+        #     st.button(
+        #         label="Back",
+        #         key="back" + str(self.name),
+        #         help="Warning: Changes will be lost!",
+        #         on_click=set_page,
+        #         args=("overview",),
+        #     )
 
         # Set debug flag to on or off this will show multiple df's if set to true
         st.session_state.is_debug = False
 
-        st.header("Add Entity Relationship")
+        st.header("Map Source Table")
 
         if 'mapping_state' in st.session_state:
             del st.session_state.mapping_state
@@ -1081,12 +1147,12 @@ class CollectionJoining(BasePage):
 
         with st.expander("Work Area", expanded=st.session_state.show_preview):
             if 'current_step' in st.session_state:
-                if st.session_state.current_step == 'initial':
-                    st.info("Please Continue your selections")
-                if st.session_state.current_step == 'done':
-                    st.info("Please Continue with your selections")
+                if st.session_state.current_step == 'initial' or st.session_state.current_step == 'done':
+                    st.info("Please Continue With Your Selections")
+                #if st.session_state.current_step == 'done':
+                #    st.info("Please Continue With Your Selections")
                 if st.session_state.current_step == 'add':
-                    st.info("Please configure your table below")
+                    st.info("Choose your source table that has all of the attributes required for this target table")
                     st.session_state.add_derived = False
 
                     if st.session_state.help_check:
@@ -1094,11 +1160,11 @@ class CollectionJoining(BasePage):
                                 This is where you will identify entities for your Source Collection \n
                                 ''')
 
-                    percent_complete2 = 0
-                    progress_text2 = "Step Completion " + str(percent_complete2) + "%"
-                    my_bar2 = st.progress(0, text=progress_text2)
-                    my_bar2.progress(percent_complete2, text=progress_text2)
-                    st.subheader('')
+                    #percent_complete2 = 0
+                    #progress_text2 = "Step Completion " + str(percent_complete2) + "%"
+                    #my_bar2 = st.progress(0, text=progress_text2)
+                    #my_bar2.progress(percent_complete2, text=progress_text2)
+                    #st.subheader('')
 
                     databases = fetch_databases()
                     st.session_state.selected_database = st.selectbox(
@@ -1143,7 +1209,7 @@ class CollectionJoining(BasePage):
                         st.write("")
                         st.write("")
                         done_adding_button = st.button(
-                            "Next Step",
+                            "Continue",
                             key="done",
                             on_click=save_entity,
                             type="primary",
@@ -1152,10 +1218,11 @@ class CollectionJoining(BasePage):
 
                 if st.session_state.current_step in ('derived', 'derived_join'):
                     if st.session_state.current_step == 'derived':
-                        percent_complete2 = 50
-                        progress_text2 = "Step Completion " + str(percent_complete2) + "%"
-                        my_bar2 = st.progress(0, text=progress_text2)
-                        my_bar2.progress(percent_complete2, text=progress_text2)
+                        pass
+                        #percent_complete2 = 50
+                        #progress_text2 = "Step Completion " + str(percent_complete2) + "%"
+                        #my_bar2 = st.progress(0, text=progress_text2)
+                        #my_bar2.progress(percent_complete2, text=progress_text2)
                     else:
                         st.session_state.add_derived = True
 
@@ -1175,8 +1242,10 @@ class CollectionJoining(BasePage):
                                             WHERE SOURCE_ENTITY_NAME = '" + st.session_state.force_entity_name + "'"
                     else:
                         source_attribute_of_entity_df = (session.table("MODELING.SOURCE_ENTITY_ATTRIBUTE")
-                                .filter(col("SOURCE_COLLECTION_NAME") == st.session_state.collection_name)
-                                .filter(col("SOURCE_ENTITY_NAME") == st.session_state.force_entity_name)).distinct()
+                                                         .filter(
+                            col("SOURCE_COLLECTION_NAME") == st.session_state.collection_name)
+                                                         .filter(
+                            col("SOURCE_ENTITY_NAME") == st.session_state.force_entity_name)).distinct()
 
                         source_attribute_of_entity_sql = "SELECT TOP 1 * FROM \
                                             MODELING.SOURCE_ENTITY \
@@ -1274,14 +1343,31 @@ class CollectionJoining(BasePage):
                             st.subheader("Preview Existing Table Records: ")
                             st.dataframe(preview_table_df)
 
-                    if not st.session_state.add_derived:
-                        add_derived_column = st.button(
-                            "Add Derived Column/Literal Value",
-                            key="add_derived_column",
-                            on_click=add_derived
-                        )
+                    bttn1, filler1, filler2, bttn2 = st.columns((3, 4, 4, 1.5))
+                    with bttn1:
+                        if not st.session_state.add_derived:
+                            add_derived_column = st.button(
+                                "Add Derived Column/Literal Value",
+                                key="add_derived_column",
+                                on_click=add_derived
+                            )
 
-                    st.text("")
+                    with bttn2:
+                        if 'current_source_index' in st.session_state:
+                            source_index_val = st.session_state.current_source_index
+                        else:
+                            source_index_val = 0
+                        if 'current_relationship_index' in st.session_state:
+                            relationship_index_val = st.session_state.current_relationship_index
+                        else:
+                            relationship_index_val = -1
+                        done_adding_button = st.button(
+                            "Continue",
+                            key="outside_done",
+                            on_click=update_manager_value,
+                            type="primary",
+                            args=("done_attributes", source_index_val, relationship_index_val)
+                        )
 
                     if 'add_derived' in st.session_state:
                         if st.session_state.add_derived:
@@ -1348,14 +1434,6 @@ class CollectionJoining(BasePage):
                             else:
                                 relationship_index_val = -1
 
-                            done_adding_button = st.button(
-                                "Done",
-                                key="outside_done",
-                                on_click=update_manager_value,
-                                type="primary",
-                                args=("done_attributes", source_index_val, relationship_index_val)
-                            )
-
                 if st.session_state.current_step == 'preview':
                     if st.session_state["streamlit_mode"] == "NativeApp":
                         qualified_table_name = st.session_state.native_database_name + ".MODELED." + st.session_state.collection_name
@@ -1381,11 +1459,22 @@ class CollectionJoining(BasePage):
                     st.write('#')
                     st.dataframe(dynamic_table)
 
+                    if 'filter_conditions' in st.session_state:
+                        filter_conditions_pd = pd.DataFrame(st.session_state.filter_conditions)
+                        if len(filter_conditions_pd) > 0:
+                            button_disable_flag = True
+                        else:
+                            button_disable_flag = False
+                    else:
+                        filter_conditions_pd = pd.DataFrame()
+                        button_disable_flag = False
+
                     add_filter_column = st.button(
                         "Add Filter",
                         key="add_filter_column",
                         on_click=add_filter_relationship,
-                        args=(0,)
+                        args=(0,),
+                        disabled=button_disable_flag
                     )
 
                     if 'add_filter' in st.session_state:
@@ -1424,7 +1513,7 @@ class CollectionJoining(BasePage):
 
                                         operator_value = condition_row.loc[0, "OPERATOR"]
                                         operatoration_index = \
-                                        operations_pd.loc[operations_pd[0] == operator_value].index[0]
+                                            operations_pd.loc[operations_pd[0] == operator_value].index[0]
 
                                         right_filter_expression_value = condition_row.loc[0, "RIGHT_FILTER_EXPRESSION"]
 
@@ -1448,7 +1537,8 @@ class CollectionJoining(BasePage):
 
                                 with add_col1:
 
-                                    if 'left_literal' + str(i) in st.session_state and st.session_state['left_literal' + str(i)]:
+                                    if 'left_literal' + str(i) in st.session_state and st.session_state[
+                                        'left_literal' + str(i)]:
                                         left_filter = st.text_input(
                                             "Left Filter",
                                             on_change=update_filter_value,
@@ -1476,10 +1566,11 @@ class CollectionJoining(BasePage):
                                         on_change=update_filter_value,
                                         index=int(operatoration_index),
                                         key="filter_operation" + str(i),
-                                        args=("filter_operation", i, )
+                                        args=("filter_operation", i,)
                                     )
                                 with add_col3:
-                                    if 'right_literal' + str(i) in st.session_state and st.session_state['right_literal' + str(i)]:
+                                    if 'right_literal' + str(i) in st.session_state and st.session_state[
+                                        'right_literal' + str(i)]:
 
                                         right_filter = st.text_input(
                                             "Right Filter",
@@ -1539,7 +1630,7 @@ class CollectionJoining(BasePage):
                             with done_col3:
                                 st.write("#")
                                 done_adding_button = st.button(
-                                    "Continue to Mapping",
+                                    "Continue",
                                     key="outside_done",
                                     on_click=set_page,
                                     type="primary",
@@ -1558,7 +1649,7 @@ class CollectionJoining(BasePage):
                             with done_col3:
                                 st.write("#")
                                 done_to_mapping = st.button(
-                                    "Continue to Mapping",
+                                    "Continue",
                                     key="outside_to_mapping",
                                     on_click=set_page,
                                     type="primary",
@@ -1594,8 +1685,6 @@ class CollectionJoining(BasePage):
                       Target Collection\n
                        ''')
 
-        src_col1, src_col2, src_col3, src_col4, src_col5 = st.columns(
-            (2, 0.2, 0.2, 2, 1), gap="small")
         for i in range(1):  # change this to filtered source df if multiple sources functionality added
             base_source_index = wizard_manager_pd[(wizard_manager_pd['IS_BASE_ENTITY'] == True)][['SOURCE_ENTITY_NAME']]
             base_source_index.reset_index(inplace=True, drop=True)
@@ -1609,37 +1698,45 @@ class CollectionJoining(BasePage):
             else:
                 base_source_index = 0
 
-            with src_col1:
+            source_select = st.selectbox(
+                "Base Table",
+                st.session_state.source_entity,
+                disabled=st.session_state.disable_flag,
+                index=int(base_source_index),
+                on_change=update_manager_value,
+                key="source_select_" + str(i),
+                args=("base_source", i, -1)
+            )
 
-                source_select = st.selectbox(
-                    "Base Table",
-                    st.session_state.source_entity,
-                    disabled=st.session_state.disable_flag,
-                    index=int(base_source_index),
-                    on_change=update_manager_value,
-                    key="source_select_" + str(i),
-                    args=("base_source", i, -1)
-                )
+            src_col1, src_col2, src_col3, src_col4, src_col5, cont_col = st.columns(
+                (2, 1.5, 3, 3, 3, 1.5), gap="small")
             if wizard_counter == 1:
-                with src_col2:
-                    st.write("#")
+                with src_col1:
                     add_source_button = st.button(
-                        ":sparkle:",
+                        ":heavy_plus_sign: Add Relationship",
                         key="add_source" + str(i),
                         on_click=add_relationship,
                         disabled=st.session_state.disable_flag,
                         args=[source_select, i, 0, "source"],
                         help="Add Relationship",
                     )
-                with src_col3:
-                    st.write("#")
+                with src_col2:
                     preview_button = st.button(
-                        ":eye:",
+                        "Preview",
                         key="preview_filter" + str(i),
                         on_click=preview_click,
                         disabled=st.session_state.disable_flag,
                         help="Preview",
                         args=[False, False]
+                    )
+                with cont_col:
+                    done_adding_button = st.button(
+                        "Continue",
+                        key="done" + str(i),
+                        on_click=preview_click,
+                        disabled=st.session_state.disable_flag,
+                        type="primary",
+                        args=(False, True)
                     )
 
             if 'columns_df' in st.session_state:
@@ -1994,21 +2091,6 @@ class CollectionJoining(BasePage):
                             help="Preview",
                             args=[False, False]
                         )
-
-            bottom_col1, bottom_col2, bottom_col3, bottom_col4 = st.columns((6, 2, 2, 2))
-            st.write("#")
-
-            with bottom_col4:
-                st.header("")
-
-                done_adding_button = st.button(
-                    "Save and Continue",
-                    key="done" + str(i),
-                    on_click=preview_click,
-                    disabled=st.session_state.disable_flag,
-                    type="primary",
-                    args=(False, True)
-                )
 
     def print_sidebar(self):
         super().print_sidebar()

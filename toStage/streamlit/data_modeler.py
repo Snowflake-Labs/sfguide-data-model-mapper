@@ -1,15 +1,15 @@
 from appPages.page import st
-from appPages.overview import OverviewPage
 from appPages.collection_list import CollectionList
 from appPages.collection_joining import CollectionJoining
 from appPages.collection_mapping import CollectionMapping
-from appPages.target_administration import TargetAdministration
 from appPages.entity_configure import EntityConfiguration
+from appPages.validation import ValidationPage
+from appPages.validations_history import ValidationsHistoryPage
+from appPages.initial_setup import InitialSetupPage
 from snowflake.snowpark.context import get_active_session
 
 
 # Check snowflake connection type
-
 
 def set_session():
     try:
@@ -42,19 +42,20 @@ def set_session():
 
 # Set starting page
 if "page" not in st.session_state:
-    st.session_state.page = "overview"
+    st.session_state.page = "collection_list"
 
     #Set table database location session variables
     #This should happen on first load only
-    st.session_state.native_database_name = "dmm_model_mapper_share_db"
+    st.session_state.native_database_name = "DATA_MODEL_MAPPER_SHARE_DB"
 
 pages = [
-    OverviewPage(),
     CollectionList(),
     CollectionJoining(),
     CollectionMapping(),
-    TargetAdministration(),
-    EntityConfiguration()
+    EntityConfiguration(),
+    ValidationPage(),
+    ValidationsHistoryPage(),
+    InitialSetupPage()
 ]
 
 

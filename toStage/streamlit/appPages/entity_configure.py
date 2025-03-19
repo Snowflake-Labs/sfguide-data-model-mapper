@@ -39,7 +39,7 @@ def drop_view_and_dynamic():
         application_name = session.sql("""select current_database()""").collect()[0][0]
 
         source_collection_pd = (
-            session.table("dmm_model_mapper_share_db.configuration.source_collection")
+            session.table("data_model_mapper_share_db.configuration.source_collection")
             .filter(col("source_collection_name") == st.session_state.collection_name)).distinct().to_pandas()
 
         source_collection_pd.reset_index(inplace=True, drop=True)
@@ -55,20 +55,20 @@ def drop_view_and_dynamic():
             # target entity
             target_entity_name = source_collection_pd.loc[0, "TARGET_ENTITY_NAME"]
 
-            view_name = 'DMM_MODEL_MAPPER_SHARE_DB.MAPPED.' + target_collection_name + '__' + version + '__' + target_entity_name
+            view_name = 'DATA_MODEL_MAPPER_SHARE_DB.MAPPED.' + target_collection_name + '__' + version + '__' + target_entity_name
 
             # Drop View Name
             drop_view_sql = f"""DROP VIEW IF EXISTS {view_name} """
-            # st.write("drop view script: " + drop_view_sql)
+
             try:
                 session.sql(drop_view_sql).collect()
             except Exception as e:
                 st.info(e)
             # Drop Dynamic Table
 
-            dynamic_table_name = 'DMM_MODEL_MAPPER_SHARE_DB.MODELED.' + st.session_state.collection_name
+            dynamic_table_name = 'DATA_MODEL_MAPPER_SHARE_DB.MODELED.' + st.session_state.collection_name
             drop_dynamic_sql = f"""DROP DYNAMIC TABLE IF EXISTS {dynamic_table_name} """
-            # st.write("drop dynamic script: " + drop_dynamic_sql)
+
             try:
                 session.sql(drop_dynamic_sql).collect()
             except Exception as e:
@@ -147,31 +147,52 @@ def remove_definitions():
 
     st.success("Collection data successfully deleted")
 
+def update_dynamic_refresh(selected_refresh_rate):
+    session = st.session_state.session
+    view_name = f'{st.session_state.selected_target_collection}__v1__{st.session_state.collection_entity_name}'
+    dyn_table_nm = st.session_state.collection_name.upper()
+    fq_dynamic_table_name = f"DATA_MODEL_MAPPER_SHARE_DB.MODELED.{dyn_table_nm}"
+    update_refresh_mins = f"""ALTER DYNAMIC TABLE {fq_dynamic_table_name} SET TARGET_LAG = '{selected_refresh_rate} minutes'; """
+    session.sql(update_refresh_mins).collect()
+    
+    show_dynamic_tables_sql = f"""show dynamic tables in DATA_MODEL_MAPPER_SHARE_DB.MODELED;"""
+    show_dynamic_tables = session.sql(show_dynamic_tables_sql).collect()
+    
+    if len(show_dynamic_tables) > 0:
+        dynamic_tables_df = pd.DataFrame(show_dynamic_tables)
+
+        for index, table in dynamic_tables_df.iterrows():
+            if table['name'] == dyn_table_nm:
+                lag_time = table['target_lag']
+                if lag_time == '1 day':
+                    lag_time = '24 hours'
+                    create_val_task = f"""call data_model_mapper_app.validation.create_validation_task('{view_name}', '{lag_time}');"""
+                    session.sql(create_val_task).collect()
+                else:
+                    create_val_task = f"""call data_model_mapper_app.validation.create_validation_task('{view_name}', '{lag_time}');"""
+                    session.sql(create_val_task).collect()
+                
 
 class EntityConfiguration(BasePage):
     def __init__(self):
         self.name = "entity_config"
 
     def print_page(self):
-        session = st.session_state.session
-
-        # View Text
-        # sql_text = """ALTER VIEW {view_name} set comment= '{"origin":"sf_sit","name":"dmm","version":{"major":1, "minor":0},"attributes":
-        #     {"component":"dmm"}}'"""
-        # st.write(sql_text)
-
+        st.title("Collection Configuration")
         get_collection_name()
 
-        tab1, tab2 = st.tabs(["Delete Colleciton", "Dynamic Refresh Schedule"])
+        st.write("")
+        if 'collection_name' in st.session_state:
+            st.write("Collection data for: " + '\n' + '**' + st.session_state.collection_name + '**')
+
+        tab1, tab2 = st.tabs(["Delete Collection", "Dynamic Refresh Schedule"])
 
         with tab1:
             if 'collection_name' in st.session_state:
-                st.header("Collection data for: " + '**' + st.session_state.collection_name + '**')
-
                 if st.session_state.collection_name == "N/A":
                     st.write("No collection data exists for deletion")
                 else:
-                    st.write("(This will delete all metadata,views,dynamic tables tied to the collection)")
+                    st.write("(This will delete all metadata, views, dynamic tables tied to the collection)")
                     st.button(
                         "DELETE ALL",
                         key="delete",
@@ -179,22 +200,18 @@ class EntityConfiguration(BasePage):
                         disabled=st.session_state.delete_enable,
                         on_click=remove_definitions,
                     )
+    
         with tab2:
-            col1, col2, col3 = st.columns((6, .25, 1))
-            with col1:
-                st.write("")
-
-                st.slider("Dynamic Table Refresh (in Minutes):", 0, 500, 60)
-            with col3:
-                st.header("#")
-                st.header("#")
-                st.button(
-                    "Save",
-                    key="save_dynamic",
-                    help="This button planned to be enabled in future release",
-                    disabled=True,
-                    on_click=remove_definitions,
-                )
+            st.write("")
+            selected_refresh_rate = st.slider("Select Dynamic Table Refresh (in Minutes):", 0, 1440, 1440)
+            st.button(
+                "Save",
+                key="save_dynamic",
+                disabled= True if st.session_state.collection_name == "N/A" else False,
+                on_click=update_dynamic_refresh,
+                args=(selected_refresh_rate,),
+                type="primary"
+            )
 
     def print_sidebar(self):
         super().print_sidebar()
